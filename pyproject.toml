@@ -1,7 +1,7 @@
 [project]
 name = "infnum"
 version = "0.1.0"
-description = "Add your description here"
+description = "Infinite and infinitesimal numbers for JAX"
 authors = [
     { name = "Alok Singh", email = "alokbeniwal@gmail.com" }
 ]
@@ -27,6 +27,7 @@ build-backend = "hatchling.build"
 managed = true
 dev-dependencies = [
     "hypothesis>=6.118.7",
+    "pytest>=8.3.3",
 ]
 
 [tool.hatch.metadata]
