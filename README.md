@@ -53,3 +53,4 @@ This project is licensed under the Apache 2 License.
 ## TODO
 
 - [ ] add complex number support
+- [ ] support non-integer powers for non-pure terms
