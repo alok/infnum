@@ -31,7 +31,6 @@ print(num)  # Output: -4.0ε⁻³ + 1.0 + 2.0ε + 3.0ε²
 
 Levi-Civita numbers support arithmetic operations like addition, subtraction, multiplication, and division. Division is truncated to 8 terms by default since it may result in an infinite series, but the higher terms are infinitesimal with respect to the lower terms.
 
-
 You may compare Levi-Civita numbers using the `<, <=, >, >=, ==, !=` operators, which considers the lexicographical order of the coefficients.
 
 ### Testing
@@ -54,3 +53,4 @@ This project is licensed under the Apache 2 License.
 
 - [ ] add complex number support
 - [ ] support non-integer powers for non-pure terms
+- [ ] support log
