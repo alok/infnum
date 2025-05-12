@@ -307,4 +307,59 @@ class SparseLCTensor:
         return "\n".join(lines)
     
     def __repr__(self) -> str:
-        return f"SparseLCTensor(batch_size={self.batch_size}, device={self.device}, dtype={self.dtype})" 
+        return f"SparseLCTensor(batch_size={self.batch_size}, device={self.device}, dtype={self.dtype})"
+
+    def abs(self) -> 'SparseLCTensor':
+        """Compute the absolute value of this tensor.
+        
+        For a Levi-Civita number x + εy, the absolute value is:
+        |x + εy| = |x| + ε*y*sign(x)
+        """
+        # Get the constant terms (ε⁰ coefficients) for each row
+        const_terms = torch.zeros(self.batch_size, device=self.values_coeffs.device)
+        for i in range(self.batch_size):
+            start, end = self.row_ptr[i], self.row_ptr[i+1]
+            # Find ε⁰ term if it exists
+            eps_idx = (self.values_exps[start:end] == 0).nonzero()
+            if len(eps_idx) > 0:
+                const_terms[i] = self.values_coeffs[start + eps_idx[0]]
+        
+        # Compute signs of constant terms
+        signs = torch.sign(const_terms)
+        
+        # Create new coefficients array with adjusted signs for ε¹ terms
+        new_coeffs = []
+        new_exps = []
+        new_row_ptr = [0]
+        
+        for i in range(self.batch_size):
+            start, end = self.row_ptr[i], self.row_ptr[i+1]
+            row_coeffs = []
+            row_exps = []
+            
+            for j in range(start, end):
+                exp = self.values_exps[j]
+                coeff = self.values_coeffs[j]
+                
+                if exp == 0:
+                    # For constant term, take absolute value
+                    row_coeffs.append(abs(coeff))
+                    row_exps.append(exp)
+                else:
+                    # For ε terms, multiply by sign of constant term
+                    row_coeffs.append(coeff * signs[i])
+                    row_exps.append(exp)
+            
+            new_coeffs.extend(row_coeffs)
+            new_exps.extend(row_exps)
+            new_row_ptr.append(len(new_coeffs))
+        
+        return SparseLCTensor(
+            torch.tensor(new_exps, device=self.values_exps.device),
+            torch.tensor(new_coeffs, device=self.values_coeffs.device),
+            torch.tensor(new_row_ptr, device=self.row_ptr.device)
+        )
+    
+    def __abs__(self) -> 'SparseLCTensor':
+        """Implement the built-in abs() function."""
+        return self.abs() 
