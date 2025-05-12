@@ -97,10 +97,10 @@ def benchmark_function(
                         eps_idx = (y.values_exps[start:end] == 0).nonzero()
                         if len(eps_idx) > 0:
                             const_terms[i] = y.values_coeffs[start + eps_idx[0]]
-                    grad, = torch.autograd.grad(const_terms.sum(), [x])
+                    grad, = torch.autograd.grad(const_terms.sum(), [x], allow_unused=True)
                 else:
-                    grad, = torch.autograd.grad(y.sum(), [x])
-                return grad
+                    grad, = torch.autograd.grad(y.sum(), [x], allow_unused=True)
+                return grad if grad is not None else torch.zeros_like(x)
             t, m = time_fn(run_autograd)
             autograd_time += t
             autograd_mem += m
