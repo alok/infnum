@@ -71,7 +71,7 @@ def benchmark_function(
     autograd_memory = []
     
     for batch_size in batch_sizes:
-        # Levi-Civita method
+        # Levi-Civita method (forward mode)
         x = torch.randn(batch_size, requires_grad=True, device=device)
         lc_time = 0
         lc_mem = 0
@@ -82,7 +82,7 @@ def benchmark_function(
         lc_times.append(lc_time / n_runs)
         lc_memory.append(lc_mem / n_runs)
         
-        # Standard autograd
+        # Standard autograd (backward mode)
         x = torch.randn(batch_size, requires_grad=True, device=device)
         autograd_time = 0
         autograd_mem = 0
@@ -126,18 +126,18 @@ def plot_results(results: List[BenchmarkResult], output_dir: Path):
         fig.add_trace(go.Scatter(
             x=result.batch_sizes,
             y=result.lc_times,
-            name=f"{result.name} (LC)",
+            name=f"{result.name} (LC Forward)",
             mode='lines+markers'
         ))
         fig.add_trace(go.Scatter(
             x=result.batch_sizes,
             y=result.autograd_times,
-            name=f"{result.name} (Autograd)",
+            name=f"{result.name} (Autograd Backward)",
             mode='lines+markers'
         ))
     
     fig.update_layout(
-        title="Time Comparison: Levi-Civita vs Standard Autograd",
+        title="Time Comparison: Levi-Civita Forward vs Autograd Backward",
         xaxis_title="Batch Size",
         yaxis_title="Time (seconds)",
         xaxis_type="log",
@@ -151,18 +151,18 @@ def plot_results(results: List[BenchmarkResult], output_dir: Path):
         fig.add_trace(go.Scatter(
             x=result.batch_sizes,
             y=result.lc_memory,
-            name=f"{result.name} (LC)",
+            name=f"{result.name} (LC Forward)",
             mode='lines+markers'
         ))
         fig.add_trace(go.Scatter(
             x=result.batch_sizes,
             y=result.autograd_memory,
-            name=f"{result.name} (Autograd)",
+            name=f"{result.name} (Autograd Backward)",
             mode='lines+markers'
         ))
     
     fig.update_layout(
-        title="Memory Usage: Levi-Civita vs Standard Autograd",
+        title="Memory Usage: Levi-Civita Forward vs Autograd Backward",
         xaxis_title="Batch Size",
         yaxis_title="Memory (MB)",
         xaxis_type="log",
