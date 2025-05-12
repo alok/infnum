@@ -1,15 +1,20 @@
 [project]
 name = "infnum"
 version = "0.3.0"
-description = "Infinite and infinitesimal numbers for PyTorch"
-authors = [{ name = "Alok Singh", email = "alokbeniwal@gmail.com" }]
-dependencies = [
-    "torch>=2.2.0; platform_system!='Windows'", # CPU-only build is fine for our purposes
-    "plotly>=5.20.0", # For visualization
-    "matplotlib>=3.10.3",
-]
+description = "Infinitesimal numbers for automatic differentiation"
+authors = [{ name = "Alok Singh", email = "alok@alok.github.io" }]
+dependencies = ["torch>=2.0.0"]
+requires-python = ">=3.12"
 readme = "README.md"
-requires-python = ">= 3.12"
+license = { text = "MIT" }
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0.0",
+    "hypothesis>=6.0.0",
+    "plotly>=6.0.0",     # For benchmark visualization
+    "numpy>=1.24.0",     # For benchmark data processing
+]
 
 [build-system]
 requires = ["hatchling"]
@@ -17,7 +22,12 @@ build-backend = "hatchling.build"
 
 [tool.rye]
 managed = true
-dev-dependencies = ["hypothesis>=6.118.7", "pytest>=8.3.3", "pudb>=2024.1.3"]
+dev-dependencies = [
+    "pytest>=8.0.0",
+    "hypothesis>=6.0.0",
+    "plotly>=6.0.0",
+    "numpy>=1.24.0",
+]
 
 [tool.hatch.metadata]
 allow-direct-references = true
