@@ -193,8 +193,15 @@ def step_fn(x: Union[torch.Tensor, SparseLCTensor]) -> Union[torch.Tensor, Spars
         # The derivative is infinite at x = 0, but we can approximate it
         # with a large value
         result = (const_terms > 0).float()
+        # Ensure result requires grad if input does
+        if x.values_coeffs.requires_grad:
+            result.requires_grad_(True)
         return SparseLCTensor.from_real(result)
-    return (x > 0).float()
+    result = (x > 0).float()
+    # Ensure result requires grad if input does
+    if x.requires_grad:
+        result.requires_grad_(True)
+    return result
 
 def round_fn(x: Union[torch.Tensor, SparseLCTensor]) -> Union[torch.Tensor, SparseLCTensor]:
     """Round function."""
@@ -209,8 +216,15 @@ def round_fn(x: Union[torch.Tensor, SparseLCTensor]) -> Union[torch.Tensor, Spar
                 const_terms[i] = x.values_coeffs[start + eps_idx[0]]
         
         result = torch.round(const_terms)
+        # Ensure result requires grad if input does
+        if x.values_coeffs.requires_grad:
+            result.requires_grad_(True)
         return SparseLCTensor.from_real(result)
-    return torch.round(x)
+    result = torch.round(x)
+    # Ensure result requires grad if input does
+    if x.requires_grad:
+        result.requires_grad_(True)
+    return result
 
 if __name__ == "__main__":
     # Set up benchmark parameters
