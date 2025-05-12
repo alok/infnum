@@ -1,12 +1,9 @@
 [project]
 name = "infnum"
-version = "0.2.0"
-description = "Infinite and infinitesimal numbers for JAX"
+version = "0.3.0"
+description = "Infinite and infinitesimal numbers for PyTorch"
 authors = [{ name = "Alok Singh", email = "alokbeniwal@gmail.com" }]
 dependencies = [
-    "jax>=0.4.35",
-    "jaxtyping>=0.2.34",
-    "jaxlib>=0.4.35",
     "torch>=2.2.0; platform_system!='Windows'", # CPU-only build is fine for our purposes
 ]
 readme = "README.md"
@@ -27,7 +24,4 @@ allow-direct-references = true
 packages = ["src/infnum"]
 
 [dependency-groups]
-dev = [
-    "ipykernel>=6.29.5",
-    "ty>=0.0.0a8",
-]
+dev = ["ipykernel>=6.29.5", "ty>=0.0.0a8"]
