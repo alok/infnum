@@ -5,6 +5,8 @@ description = "Infinite and infinitesimal numbers for PyTorch"
 authors = [{ name = "Alok Singh", email = "alokbeniwal@gmail.com" }]
 dependencies = [
     "torch>=2.2.0; platform_system!='Windows'", # CPU-only build is fine for our purposes
+    "plotly>=5.20.0", # For visualization
+    "matplotlib>=3.10.3",
 ]
 readme = "README.md"
 requires-python = ">= 3.12"
