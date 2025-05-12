@@ -1,0 +1,64 @@
+\documentclass{article}
+\usepackage{neurips_2025}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{graphicx}
+\usepackage{hyperref}
+
+\title{Differentiating Through Discontinuities: A Levi-Civita Field Approach}
+
+\author{
+    Alok Singh\\
+    \texttt{alok@alok.github.io}
+}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+We present a novel approach to automatic differentiation that can handle discontinuous functions by leveraging the Levi-Civita field. Our method extends PyTorch's autograd system with a sparse representation of Levi-Civita numbers, enabling the computation of derivatives through functions like absolute value, step functions, and rounding operations. We demonstrate empirically that our approach is both memory-efficient and computationally tractable, opening new possibilities for training neural networks with discontinuous components.
+\end{abstract}
+
+\section{Introduction}
+Automatic differentiation is a cornerstone of modern machine learning, but standard approaches cannot handle discontinuous functions. This limitation becomes particularly relevant when working with operations like quantization, thresholding, or discrete decision-making within neural networks. We propose a solution based on the Levi-Civita field, which extends the real numbers with infinitesimals in a way that makes discontinuous functions differentiable.
+
+\section{Method}
+Our approach represents Levi-Civita numbers using a sparse format that tracks both coefficients and their exponents. Each number is represented as a sum of terms \(c_i \varepsilon^{e_i}\), where \(c_i\) are real coefficients and \(e_i\) are rational exponents. The key insight is that we can extract the derivative by looking at the coefficient of \(\varepsilon^1\) in the result.
+
+For a discontinuous function \(f\), we:
+\begin{enumerate}
+    \item Convert input \(x\) to \(x + \varepsilon\)
+    \item Evaluate \(f(x + \varepsilon)\)
+    \item Extract the coefficient of \(\varepsilon^1\) to get \(f'(x)\)
+\end{enumerate}
+
+\section{Implementation}
+We implement this approach in PyTorch using a custom autograd function that handles the forward and backward passes through Levi-Civita operations. Our implementation:
+\begin{itemize}
+    \item Uses a CSR-like sparse format for efficient storage
+    \item Integrates with PyTorch's autograd system
+    \item Supports batched operations for parallel processing
+\end{itemize}
+
+\section{Results}
+We benchmark our implementation against standard PyTorch autograd on three discontinuous functions:
+\begin{itemize}
+    \item Absolute value: \(|x|\)
+    \item Step function: \(\mathbb{1}_{x > 0}\)
+    \item Round function: \(\lfloor x + 0.5 \rfloor\)
+\end{itemize}
+
+Our results show that the Levi-Civita approach successfully computes derivatives through these discontinuous functions while maintaining reasonable computational overhead.
+
+\section{Conclusion}
+The Levi-Civita field provides a principled way to differentiate through discontinuities, extending the capabilities of automatic differentiation systems. Our implementation demonstrates that this approach is practical and can be integrated into existing deep learning frameworks.
+
+\section{Future Work}
+Future directions include:
+\begin{itemize}
+    \item Optimizing the sparse representation for better performance
+    \item Extending to higher-order derivatives
+    \item Applying to real-world problems in quantized neural networks
+\end{itemize}
+
+\end{document} 
