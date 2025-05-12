@@ -3,7 +3,18 @@ import math
 from operator import itemgetter
 from typing import Self
 import jax.numpy as jnp
-from jaxtyping import Float
+from jaxtyping import Float, Array
+from functools import partial, cached_property
+import jax
+from jax import jit
+
+# (Optional) PyTorch backend -------------------------------------------------------
+try:
+    from .torch_backend import LeviCivitaTensor as LeviCivitaTensor  # noqa: F401
+    from .torch_backend import ε as ε_torch, H as H_torch  # noqa: F401
+except ModuleNotFoundError:
+    # torch is not an essential dependency for the core JAX backend; ignore if absent.
+    pass
 
 """
 All exponents are in terms of ε. So negative exponents correspond to infinite terms.
@@ -11,6 +22,7 @@ All exponents are in terms of ε. So negative exponents correspond to infinite t
 
 type Exponent = Float
 type Coefficient = Float
+
 
 @dataclass
 class LeviCivitaNumber:
@@ -45,15 +57,67 @@ class LeviCivitaNumber:
             if not jnp.isclose(coefficient, 0.0)
         }
 
+    @classmethod
+    @partial(jit, static_argnums=(0, 1))
+    def _add_terms(
+        cls, terms1: dict[Exponent, Array], terms2: dict[Exponent, Array]
+    ) -> dict[Exponent, Array]:
+        """JIT-compiled addition of term dictionaries."""
+        result = {}
+        all_exps = set(terms1.keys()) | set(terms2.keys())
+        for exp in all_exps:
+            coeff = terms1.get(exp, 0.0) + terms2.get(exp, 0.0)
+            if not jnp.isclose(coeff, 0.0):
+                result[exp] = coeff
+        return result
+
+    @classmethod
+    @partial(jit, static_argnums=(0, 1))
+    def _mul_terms(
+        cls, terms1: dict[Exponent, Array], terms2: dict[Exponent, Array]
+    ) -> dict[Exponent, Array]:
+        """JIT-compiled multiplication of term dictionaries."""
+        result = {}
+        for exp1, coeff1 in terms1.items():
+            for exp2, coeff2 in terms2.items():
+                exp = exp1 + exp2
+                coeff = coeff1 * coeff2
+                result[exp] = result.get(exp, 0.0) + coeff
+        return {k: v for k, v in result.items() if not jnp.isclose(v, 0.0)}
+
+    @classmethod
+    @partial(jit, static_argnums=(0, 1))
+    def _div_terms(
+        cls, terms1: dict[Exponent, Array], pure_exp: float, pure_coeff: Array
+    ) -> dict[Exponent, Array]:
+        """JIT-compiled division by a pure term."""
+        return {exp - pure_exp: coeff / pure_coeff for exp, coeff in terms1.items()}
+
+    @classmethod
+    @partial(jit, static_argnums=(0, 1))
+    def _neg_terms(cls, terms: dict[Exponent, Array]) -> dict[Exponent, Array]:
+        """JIT-compiled negation of terms."""
+        return {exp: -coeff for exp, coeff in terms.items()}
+
+    @classmethod
+    @partial(jit, static_argnums=(0, 1, 2))
+    def _compute_inverse_series(
+        cls, eps_x_terms: dict[Exponent, Array], num_terms: int
+    ) -> dict[Exponent, Array]:
+        """JIT-compiled computation of inverse power series."""
+        result = {0: jnp.array(1.0)}
+        eps_x = LeviCivitaNumber(eps_x_terms)
+
+        for k in range(1, num_terms):
+            term = ((-eps_x) ** k).truncate(max_order=10)
+            result = cls._add_terms(result, term.terms)
+
+        return result
+
     def __add__(self, other: CoeffLike) -> "LeviCivitaNumber":
         if isinstance(other, (float, int)):
             other = LeviCivitaNumber.from_number(other)
-        return LeviCivitaNumber(
-            {
-                exp: self.terms.get(exp, 0.0) + other.terms.get(exp, 0.0)
-                for exp in set(self.terms.keys()) | set(other.terms.keys())
-            }
-        )
+        return LeviCivitaNumber(self._add_terms(self.terms, other.terms))
 
     def __radd__(self, other: CoeffLike) -> "LeviCivitaNumber":
         if isinstance(other, (float, int)):
@@ -69,14 +133,7 @@ class LeviCivitaNumber:
     def __mul__(self, other: CoeffLike) -> "LeviCivitaNumber":
         if isinstance(other, (float, int)):
             other = LeviCivitaNumber.from_number(other)
-        new_terms: dict[Exponent, Coefficient] = {}
-        # Multiply each term from self with each term from other
-        for exp1, coeff1 in self.terms.items():
-            for exp2, coeff2 in other.terms.items():
-                exp = exp1 + exp2
-                coeff = coeff1 * coeff2
-                new_terms[exp] = new_terms.get(exp, 0.0) + coeff
-        return LeviCivitaNumber(new_terms)
+        return LeviCivitaNumber(self._mul_terms(self.terms, other.terms))
 
     def __pow__(self, other: int | float) -> "LeviCivitaNumber":
         if isinstance(other, float):
@@ -101,27 +158,25 @@ class LeviCivitaNumber:
 
     def __invert__(self, num_terms: int = 8) -> "LeviCivitaNumber":
         """Reciprocal of a Levi-Civita number."""
-        # breakpoint()
         if self.is_zero:
             raise ZeroDivisionError("Division by zero")
+
         if self.only_term is not None:
             exp, coeff = self.only_term
             return LeviCivitaNumber({-exp: 1.0 / coeff})
-        else:
-            # Normalize by the largest term
-            largest_exp = min(self.terms.keys())
-            largest_coeff = self.terms[largest_exp]
-            largest_term = LeviCivitaNumber({largest_exp: largest_coeff})
-            rest = self / largest_term  # Uses our updated division method
 
-            # Compute εₓ = rest - 1 (since rest is now close to 1)
-            eps_x = rest - 1
-            total = LeviCivitaNumber.zero()
-            for k in range(num_terms):  # TODO compare to lean, truncate here bc eps_x grows?
-                term = ((-eps_x) ** k).truncate(max_order=10)
-                total += term
-            return (~largest_term) * total
+        # Normalize by largest term
+        largest_exp = min(self.terms.keys())
+        largest_coeff = self.terms[largest_exp]
+        largest_term = LeviCivitaNumber({largest_exp: largest_coeff})
+        rest = self / largest_term
 
+        # Compute εₓ = rest - 1
+        eps_x = rest - 1
+
+        # Use JIT-compiled series computation
+        total_terms = self._compute_inverse_series(eps_x.terms, num_terms)
+        return (~largest_term) * LeviCivitaNumber(total_terms)
 
     def __truediv__(self, other: CoeffLike) -> "LeviCivitaNumber":
         if isinstance(other, (float, int)):
@@ -131,10 +186,7 @@ class LeviCivitaNumber:
         if other.only_term is not None:
             # Direct division when other is a pure term
             pure_exp, pure_coeff = other.only_term
-            new_terms = {
-                exp - pure_exp: coeff / pure_coeff for exp, coeff in self.terms.items()
-            }
-            return LeviCivitaNumber(new_terms)
+            return LeviCivitaNumber(self._div_terms(self.terms, pure_exp, pure_coeff))
         else:
             # General case: multiply by inverse
             return self * ~other
@@ -146,7 +198,7 @@ class LeviCivitaNumber:
         return self * other
 
     def __neg__(self) -> "LeviCivitaNumber":
-        return -1 * self
+        return LeviCivitaNumber(self._neg_terms(self.terms))
 
     def __sub__(self, other: CoeffLike) -> "LeviCivitaNumber":
         return self + (-other)
@@ -360,6 +412,18 @@ class LeviCivitaNumber:
         """Largest term of a Levi-Civita number by order."""
         return min(self.terms.items(), key=itemgetter(0), default=(0.0, 0.0))
 
+    @classmethod
+    @partial(jit, static_argnums=(0, 2))
+    def _is_close_terms(
+        cls, terms1: dict[Exponent, Array], terms2: dict[Exponent, Array], tol: float
+    ) -> bool:
+        """JIT-compiled comparison of terms."""
+        exponents = set(terms1.keys()) | set(terms2.keys())
+        return all(
+            jnp.isclose(terms1.get(exp, 0.0), terms2.get(exp, 0.0), atol=tol)
+            for exp in exponents
+        )
+
     def is_close_to(
         self, other: CoeffLike, tol: float = 1e-6, max_order: float | None = None
     ) -> bool:
@@ -373,23 +437,29 @@ class LeviCivitaNumber:
         if isinstance(other, (float, int)):
             other = LeviCivitaNumber.from_number(other)
 
-        # Get all exponents up to max_order
-        exponents = set(self.terms.keys()).union(other.terms.keys())
+        terms1 = self.terms
+        terms2 = other.terms
         if max_order is not None:
-            exponents = {exp for exp in exponents if exp <= max_order}
+            terms1 = self._truncate_terms(terms1, -float("inf"), max_order)
+            terms2 = self._truncate_terms(terms2, -float("inf"), max_order)
 
-        return all(
-            jnp.isclose(self.terms.get(exp, 0.0), other.terms.get(exp, 0.0), atol=tol)
-            for exp in exponents
-        )
+        return self._is_close_terms(terms1, terms2, tol)
+
+    @classmethod
+    @partial(jit, static_argnums=(0, 2))
+    def _truncate_terms(
+        cls, terms: dict[Exponent, Array], min_order: float, max_order: float
+    ) -> dict[Exponent, Array]:
+        """JIT-compiled truncation of terms."""
+        return {
+            exp: coeff for exp, coeff in terms.items() if min_order <= exp <= max_order
+        }
 
     def truncate(
         self, min_order: float = -float("inf"), max_order: float = float("inf")
     ) -> "LeviCivitaNumber":
         """Truncate a Levi-Civita number to a given order."""
-        return LeviCivitaNumber(
-            {exp: coeff for exp, coeff in self.terms.items() if min_order <= exp <= max_order}
-        )
+        return LeviCivitaNumber(self._truncate_terms(self.terms, min_order, max_order))
 
     def terms_fromjax(self) -> dict[Exponent, Coefficient]:
         """Convert JAX arrays to regular floats."""
