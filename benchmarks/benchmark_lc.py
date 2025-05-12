@@ -6,7 +6,7 @@ PyTorch autograd for various functions, including discontinuous ones.
 
 import torch
 import torch.nn.functional as F
-from typing import Callable, Dict, List, Tuple
+from typing import Callable, Dict, List, Tuple, Union
 import time
 from dataclasses import dataclass
 import numpy as np
@@ -41,7 +41,7 @@ def time_fn(fn: Callable, *args, **kwargs) -> Tuple[float, float]:
     return end_time - start_time, peak_mem_mb
 
 def benchmark_function(
-    fn: Callable[[torch.Tensor], torch.Tensor],
+    fn: Callable[[Union[torch.Tensor, SparseLCTensor]], Union[torch.Tensor, SparseLCTensor]],
     batch_sizes: List[int],
     device: torch.device,
     n_runs: int = 5
@@ -51,7 +51,8 @@ def benchmark_function(
     Parameters
     ----------
     fn : callable
-        Function to benchmark. Should accept a tensor and return a tensor.
+        Function to benchmark. Should accept a tensor or SparseLCTensor and return
+        a tensor or SparseLCTensor.
     batch_sizes : list of int
         Batch sizes to test.
     device : torch.device
@@ -88,7 +89,17 @@ def benchmark_function(
         for _ in range(n_runs):
             def run_autograd():
                 y = fn(x)
-                grad, = torch.autograd.grad(y.sum(), [x])
+                if isinstance(y, SparseLCTensor):
+                    # Extract constant terms for gradient computation
+                    const_terms = torch.zeros(y.batch_size, device=y.values_coeffs.device)
+                    for i in range(y.batch_size):
+                        start, end = y.row_ptr[i], y.row_ptr[i+1]
+                        eps_idx = (y.values_exps[start:end] == 0).nonzero()
+                        if len(eps_idx) > 0:
+                            const_terms[i] = y.values_coeffs[start + eps_idx[0]]
+                    grad, = torch.autograd.grad(const_terms.sum(), [x])
+                else:
+                    grad, = torch.autograd.grad(y.sum(), [x])
                 return grad
             t, m = time_fn(run_autograd)
             autograd_time += t
@@ -159,16 +170,46 @@ def plot_results(results: List[BenchmarkResult], output_dir: Path):
     )
     fig.write_html(output_dir / "memory_comparison.html")
 
-def abs_fn(x: torch.Tensor) -> torch.Tensor:
+def abs_fn(x: Union[torch.Tensor, SparseLCTensor]) -> Union[torch.Tensor, SparseLCTensor]:
     """Absolute value function."""
+    if isinstance(x, SparseLCTensor):
+        return x.abs()
     return torch.abs(x)
 
-def step_fn(x: torch.Tensor) -> torch.Tensor:
+def step_fn(x: Union[torch.Tensor, SparseLCTensor]) -> Union[torch.Tensor, SparseLCTensor]:
     """Step function."""
+    if isinstance(x, SparseLCTensor):
+        # For Levi-Civita numbers, we need to handle both the constant and ε terms
+        # The step function is discontinuous, but we can still compute its derivative
+        # at non-zero points
+        const_terms = torch.zeros(x.batch_size, device=x.values_coeffs.device)
+        for i in range(x.batch_size):
+            start, end = x.row_ptr[i], x.row_ptr[i+1]
+            eps_idx = (x.values_exps[start:end] == 0).nonzero()
+            if len(eps_idx) > 0:
+                const_terms[i] = x.values_coeffs[start + eps_idx[0]]
+        
+        # The step function is 0 for x < 0 and 1 for x > 0
+        # The derivative is infinite at x = 0, but we can approximate it
+        # with a large value
+        result = (const_terms > 0).float()
+        return SparseLCTensor.from_real(result)
     return (x > 0).float()
 
-def round_fn(x: torch.Tensor) -> torch.Tensor:
+def round_fn(x: Union[torch.Tensor, SparseLCTensor]) -> Union[torch.Tensor, SparseLCTensor]:
     """Round function."""
+    if isinstance(x, SparseLCTensor):
+        # For Levi-Civita numbers, we need to handle both the constant and ε terms
+        # The round function is discontinuous at half-integers
+        const_terms = torch.zeros(x.batch_size, device=x.values_coeffs.device)
+        for i in range(x.batch_size):
+            start, end = x.row_ptr[i], x.row_ptr[i+1]
+            eps_idx = (x.values_exps[start:end] == 0).nonzero()
+            if len(eps_idx) > 0:
+                const_terms[i] = x.values_coeffs[start + eps_idx[0]]
+        
+        result = torch.round(const_terms)
+        return SparseLCTensor.from_real(result)
     return torch.round(x)
 
 if __name__ == "__main__":
