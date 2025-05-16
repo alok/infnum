@@ -1,0 +1,9 @@
+goal: implement the levi civita field in pytorch and show how it can differentiate discontinuous functions like in https://alok.github.io/2024/09/28/discontinuous-derivative/
+
+submit to neurips 2025 (extended abstract), emphasizing the fact that it can differentiate discontinuous functions.
+
+put any neurips material in @main.tex
+
+use `uv` for all python package management.
+
+despite the lean 4 code, this is a python project for neurips.

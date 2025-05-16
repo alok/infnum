@@ -1,0 +1,13 @@
+{
+	"folders": [
+		{
+			"path": "."
+		},
+		{
+			"path": "../lean-inf"
+		}
+	],
+	"settings": {
+		"terminal.integrated.shellIntegration.enabled": true
+	}
+}

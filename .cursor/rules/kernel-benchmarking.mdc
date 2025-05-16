@@ -1,0 +1,50 @@
+---
+description: optimizing
+globs: 
+alwaysApply: false
+---
+# Kernel Benchmarking Workflow
+
+## When does this rule apply?
+* Any time you modify or add performance-critical code under `src/infnum/` (e.g. `SparseLCTensor.__add__`, `__mul__`, `reciprocal`, etc.).
+* When the commit message references *optimisation*, *speed-up*, or *kernel*.
+
+## Benchmark Harness
+1. **Micro-benchmarks** live in [`tests/test_benchmark_micro.py`](mdc:infnum/tests/test_benchmark_micro.py).
+2. Run them with:
+   ```bash
+   pytest tests/test_benchmark_micro.py --benchmark-only --benchmark-json=.bench/latest.json
+   ```
+3. The run is intentionally tiny (≤1 k inputs) so it executes quickly during local development and CI.
+
+## Updating Results
+1. Convert the JSON into a Markdown table:
+   ```bash
+   python - <<'PY'
+   import json, pathlib, textwrap, datetime, sys
+   data = json.load(open('.bench/latest.json'))['benchmarks']
+   rows = [[b['fullname'], f"{b['stats']['mean']*1e6:,.1f} µs"] for b in data]
+   table = "\n".join(f"| {n} | {t} |" for n, t in rows)
+   out = textwrap.dedent(f"""
+   ### {datetime.datetime.now().strftime('%Y-%m-%d %H:%M')}
+   | Benchmark | Mean time |
+   |-----------|-----------|
+   {table}
+   """)
+   md = pathlib.Path('BENCHMARKS.md')
+   md.write_text(out + "\n" + md.read_text() if md.exists() else out)
+   PY
+   ```
+2. Commit `BENCHMARKS.md` in the same patch as the kernel change.
+3. Add a brief bullet highlighting the speed-up in `CHANGELOG.md`.
+
+## CI Guard (optional)
+* For regressions, you may pin an *upper-bound* on mean runtime using the `--benchmark-max-time` switch or by adding an assertion in the harness.
+
+## Rationale
+* Keeping numbers in *version control* provides a historical record and makes performance regressions visible during code review.
+* Markdown is human-friendly and renders nicely on GitHub.
+
+---
+
+*Last reviewed: TODO-replace-with-`get_current_time` output when editing next time.*
