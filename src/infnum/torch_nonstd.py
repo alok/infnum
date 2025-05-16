@@ -86,13 +86,12 @@ def ngrad(f: _LCFunc, x: Tensor) -> Tensor:
 
     Implementation details
     ----------------------
-    1. Evaluate the function at the *perturbed* point: ``y₁ = f(x + ε)``.
-    2. Evaluate the function at the *base* point:       ``y₀ = f(x)``.
-       (``x`` is lifted to a *Levi-Civita* number with **no** infinitesimal
-       terms.)
-    3. Form the difference quotient ``(y₁ − y₀) / ε`` which lives again in the
-       Levi-Civita field.
-    4. Read off the coefficient of ``ε⁰`` – that real number is the
+    1. Forward  value   f(x + ε) -------------------------------------------
+    2. Backward value  f(x − ε) -------------------------------------------
+    3. Base value      f(x)  (no ε) ----------------------------------------
+    4. Symmetric difference quotients  -------------------------------------
+    5. Average to obtain *Clarke* derivative which equals 0 for |x| at 0, etc.
+    6. Read off the coefficient of ``ε⁰`` – that real number is the
        *non-standard* derivative.
 
     Finally we call ``torch.autograd.grad`` on the real coefficient so the
@@ -117,14 +116,21 @@ def ngrad(f: _LCFunc, x: Tensor) -> Tensor:
     # Ensure *x* participates in autograd without mutating caller's tensor.
     x_var = x.detach().clone().requires_grad_(True)
 
-    # 1. f(x + ε) -------------------------------------------------------------
-    y_perturbed = f(to_nonstd(x_var))
+    # 1. Forward  value   f(x + ε) -------------------------------------------
+    y_fwd = f(to_nonstd(x_var))
 
-    # 2. f(x) at the *exact* base point (no ε) -------------------------------
+    # 2. Backward value  f(x − ε) -------------------------------------------
+    y_bwd = f(LeviCivitaTensor.from_number(x_var) - ε)
+
+    # 3. Base value      f(x)  (no ε) ----------------------------------------
     y_base = f(LeviCivitaTensor.from_number(x_var))
 
-    # 3. Difference quotient ---------------------------------------------------
-    diff = (y_perturbed - y_base) / ε
+    # 4. Symmetric difference quotients  -------------------------------------
+    diff_fwd = (y_fwd - y_base) / ε
+    diff_bwd = (y_base - y_bwd) / ε
+
+    # Average to obtain *Clarke* derivative which equals 0 for |x| at 0, etc.
+    diff = 0.5 * (diff_fwd + diff_bwd)
 
     # Coefficient of ε⁰ carries the derivative
     coeff_0 = diff.terms.get(0.0)
@@ -132,6 +138,5 @@ def ngrad(f: _LCFunc, x: Tensor) -> Tensor:
         # Derivative happened to be exactly zero
         coeff_0 = torch.zeros_like(x_var)
 
-    # Ask PyTorch for ∂coeff₀ / ∂x
-    (grad_x,) = torch.autograd.grad(coeff_0, x_var, retain_graph=False, create_graph=False)
-    return grad_x 
+    # We *return* the coefficient itself which corresponds to ∂f/∂x.
+    return coeff_0 

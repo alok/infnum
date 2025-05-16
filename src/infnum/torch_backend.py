@@ -262,12 +262,14 @@ class LeviCivitaTensor:
     # Properties & utility methods
     # ------------------------------------------------------------------
 
-    @cached_property
+    @property
     def is_zero(self) -> bool:
+        """True if the Levi-Civita number is exactly 0."""
         return len(self.terms) == 0
 
-    @cached_property
+    @property
     def only_term(self) -> tuple[Exponent, Coefficient] | None:
+        """Return (exp, coeff) when number has exactly one non-zero term."""
         if len(self.terms) == 1:
             return next(iter(self.terms.items()))
         if self.is_zero:

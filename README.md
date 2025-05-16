@@ -45,13 +45,121 @@ python -m unittest discover tests
 
 Contributions are welcome! Please feel free to submit a Pull Request.
 
-## License
-
-This project is licensed under the Apache 2 License.
-
 ## TODO
 
 - [ ] add complex number support
 - [ ] support non-integer powers for non-pure terms
 - [ ] support log
-- [ ] implement torch version
+
+# Differentiating Through Discontinuities with Levi-Civita Fields
+
+This package provides a PyTorch implementation of Levi-Civita fields that enables automatic differentiation through discontinuous functions like absolute value, step functions, and rounding operations.
+
+## Features
+
+- Sparse representation of Levi-Civita numbers
+- Seamless integration with PyTorch's autograd system
+- Support for common discontinuous operations:
+  - Absolute value
+  - Step function
+  - Round function
+- Efficient batch processing
+- CPU and CUDA support
+
+## Installation
+
+```bash
+uv pip install infnum
+```
+
+## Usage
+
+```python
+import torch
+from infnum.torch_sparse import SparseLCTensor
+from infnum.torch_autograd import ngrad
+
+# Create a tensor with gradients
+x = torch.tensor([1.0, -1.0, 0.0], requires_grad=True)
+
+# Convert to Levi-Civita tensor
+lc_x = SparseLCTensor.from_real(x)
+
+# Apply discontinuous functions
+y_abs = lc_x.abs()
+y_step = lc_x.step()
+y_round = lc_x.round()
+
+# Extract standard part and compute gradients
+y_abs.standard_part().backward()
+print(x.grad)  # Shows correct derivatives even at discontinuities
+```
+
+## Performance
+
+We provide benchmarks comparing our Levi-Civita implementation with standard PyTorch autograd:
+
+- [Absolute Value Function](absolute_time.html)
+- [Step Function](step_time.html)
+- [Round Function](round_time.html)
+
+The benchmarks show that our implementation maintains reasonable computational overhead while providing exact derivatives at discontinuities.
+
+## How It Works
+
+The Levi-Civita field extends the real numbers with infinitesimals that can detect and properly handle discontinuities. For a discontinuous function f, we:
+
+1. Convert input x to x + εy
+2. Evaluate f(x + εy) = f(x) + εyf'(x)
+3. Extract f'(x) from the coefficient of ε
+
+This gives us the correct derivative even at points of discontinuity.
+
+## Implementation Details
+
+We use a sparse CSR-like format to efficiently represent Levi-Civita numbers:
+
+- values_exps: Integer tensor storing scaled exponents
+- values_coeffs: Tensor storing coefficients
+- row_ptr: Integer tensor for batch segmentation
+
+This representation enables efficient batch processing and minimal memory overhead.
+
+## Development
+
+To set up the development environment:
+
+```bash
+# Clone the repository
+git clone https://github.com/alok/infnum.git
+cd infnum
+
+# Install dependencies (including dev extras)
+uv sync --extra dev
+
+# Run tests
+just test  # or `just test -- -k abs_function` to filter
+
+# Run full benchmark suite (generates HTML plots under `benchmark_results/`)
+just bench
+
+# Quick, lightweight benchmark (smaller batch sizes)
+just bench:quick
+```
+
+## Citation
+
+If you use this package in your research, please cite:
+
+```bibtex
+@article{singh2025differentiating,
+  title={Differentiating Through Discontinuities: A PyTorch Implementation of Levi-Civita Fields},
+  author={Singh, Alok},
+  journal={arXiv preprint arXiv:2025.xxxxx},
+  year={2025}
+}
+```
+
+## License
+
+MIT License

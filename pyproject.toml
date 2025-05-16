@@ -1,9 +1,9 @@
 [project]
 name = "infnum"
-version = "0.3.0"
+version = "0.4.0"
 description = "Infinitesimal numbers for automatic differentiation"
 authors = [{ name = "Alok Singh", email = "alok@alok.github.io" }]
-dependencies = ["torch>=2.0.0"]
+dependencies = ["torch>=2.0.0", "tyro>=0.9.20"]
 requires-python = ">=3.12"
 readme = "README.md"
 license = { text = "MIT" }
@@ -12,8 +12,10 @@ license = { text = "MIT" }
 dev = [
     "pytest>=8.0.0",
     "hypothesis>=6.0.0",
-    "plotly>=6.0.0",     # For benchmark visualization
-    "numpy>=1.24.0",     # For benchmark data processing
+    "plotly>=6.0.0",           # For benchmark visualization
+    "numpy>=1.24.0",           # For benchmark data processing
+    "tyro>=0.7.0",             # Advanced CLI parsing
+    "pytest-benchmark>=4.0.0", # Micro-benchmark plugin for pytest
 ]
 
 [build-system]
@@ -27,6 +29,8 @@ dev-dependencies = [
     "hypothesis>=6.0.0",
     "plotly>=6.0.0",
     "numpy>=1.24.0",
+    "tyro>=0.7.0",
+    "pytest-benchmark>=4.0.0",
 ]
 
 [tool.hatch.metadata]
@@ -36,4 +40,4 @@ allow-direct-references = true
 packages = ["src/infnum"]
 
 [dependency-groups]
-dev = ["ipykernel>=6.29.5", "ty>=0.0.0a8"]
+dev = ["ipykernel>=6.29.5", "ty>=0.0.0a8", "tyro>=0.7.0"]
